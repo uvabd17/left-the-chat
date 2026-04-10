@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LEFT THE CHAT</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap" rel="stylesheet" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: 'DM Sans', sans-serif;
+        background: #FFF5E1;
+        color: #000;
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
+      }
+      ::selection {
+        background: #FF90E8;
+        color: #000;
+      }
+      input:focus, textarea:focus {
+        outline: 3px solid #FF90E8;
+        outline-offset: 0px;
+      }
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: #FFF5E1; }
+      ::-webkit-scrollbar-thumb { background: #000; }
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        20% { transform: translateX(-8px); }
+        40% { transform: translateX(8px); }
+        60% { transform: translateX(-6px); }
+        80% { transform: translateX(6px); }
+      }
+      @keyframes slideInRight {
+        from { opacity: 0; transform: translateX(60px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes fadeUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes popIn {
+        0% { transform: scale(0); }
+        70% { transform: scale(1.2); }
+        100% { transform: scale(1); }
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      @keyframes scramble {
+        0% { opacity: 1; filter: blur(0); }
+        50% { opacity: 0.7; filter: blur(2px); }
+        100% { opacity: 0; filter: blur(8px); transform: translateY(30px) scale(0.9); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

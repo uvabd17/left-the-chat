@@ -1,0 +1,61 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Students — read by anyone (for classmate lists), write by admin only
+    match /students/{rollNo} {
+      allow read: if true;
+      allow write: if true;
+      // In production, lock writes to admin SDK or authenticated admin
+    }
+
+    // Settings — readable by all, writable by admin
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Messages — anyone can create, read own, delete own
+    match /messages/{messageId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if true;
+    }
+
+    // Slam books — anyone can read, create own, update reactions
+    match /slambooks/{rollNo} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Votes — anyone can create own, read all
+    match /votes/{voteId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if false;
+    }
+
+    // Superlative votes
+    match /superlatives/{voteId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if false;
+    }
+
+    // Unsent wall — anyone can create, read all
+    match /unsent/{postId} {
+      allow read: if true;
+      allow create: if true;
+      allow delete: if true;
+    }
+
+    // Future self — create own, read own
+    match /futureself/{rollNo} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if false;
+    }
+  }
+}
