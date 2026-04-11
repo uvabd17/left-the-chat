@@ -419,23 +419,66 @@ export default function AdminPanel() {
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && !loading && (
           <div style={{ ...card }}>
-            <h2 style={{ fontSize: 20, fontWeight: 800, textTransform: 'uppercase', marginBottom: 16 }}>CLASS QUIZ QUESTIONS</h2>
-            {classQuestions.map((q, i) => (
-              <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                <input value={typeof q === 'object' ? (q.question || '') : q} onChange={e => {
-                  const nq = [...classQuestions]
-                  nq[i] = typeof q === 'object' ? { ...q, question: e.target.value } : e.target.value
-                  setClassQuestions(nq)
-                }} placeholder="Question" style={{ ...input, flex: 2 }} />
-                <input value={q.answer || ''} onChange={e => {
-                  const nq = [...classQuestions]
-                  nq[i] = { question: typeof q === 'string' ? q : q.question, answer: e.target.value }
-                  setClassQuestions(nq)
-                }} placeholder="Answer" style={{ ...input, flex: 1 }} />
-                <button onClick={() => setClassQuestions(classQuestions.filter((_, j) => j !== i))} style={btn(C.red)}>X</button>
-              </div>
-            ))}
-            <button onClick={() => setClassQuestions([...classQuestions, { question: '', answer: '' }])} style={{ ...btn(C.surface), marginBottom: 24 }}>+ ADD QUESTION</button>
+            <h2 style={{ fontSize: 20, fontWeight: 800, textTransform: 'uppercase', marginBottom: 16 }}>CLASS QUIZ QUESTIONS (MCQ)</h2>
+            {classQuestions.map((q, i) => {
+              const qObj = typeof q === 'object' ? q : { question: q, options: ['', ''], correct: 0 }
+              return (
+                <div key={i} style={{ border: `2px solid ${C.border}`, padding: 16, marginBottom: 12, background: C.bg }}>
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                    <input value={qObj.question || ''} onChange={e => {
+                      const nq = [...classQuestions]
+                      nq[i] = { ...qObj, question: e.target.value }
+                      setClassQuestions(nq)
+                    }} placeholder="Question" style={{ ...input, flex: 1, fontWeight: 700 }} />
+                    <button onClick={() => setClassQuestions(classQuestions.filter((_, j) => j !== i))} style={btn(C.red)}>X</button>
+                  </div>
+                  <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#555', marginBottom: 8 }}>OPTIONS (click radio to mark correct)</p>
+                  {(qObj.options || []).map((opt, j) => (
+                    <div key={j} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                      <div
+                        onClick={() => {
+                          const nq = [...classQuestions]
+                          nq[i] = { ...qObj, correct: j }
+                          setClassQuestions(nq)
+                        }}
+                        style={{
+                          width: 22, height: 22, borderRadius: '50%', cursor: 'pointer', flexShrink: 0,
+                          border: `2px solid ${qObj.correct === j ? C.green : C.border}`,
+                          background: qObj.correct === j ? C.green : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center'
+                        }}
+                      >
+                        {qObj.correct === j && <span style={{ color: '#fff', fontSize: 12, fontWeight: 900 }}>✓</span>}
+                      </div>
+                      <input value={opt} onChange={e => {
+                        const nq = [...classQuestions]
+                        const newOpts = [...(qObj.options || [])]
+                        newOpts[j] = e.target.value
+                        nq[i] = { ...qObj, options: newOpts }
+                        setClassQuestions(nq)
+                      }} placeholder={`Option ${j + 1}`} style={{ ...input, flex: 1, background: qObj.correct === j ? C.green + '22' : input.background }} />
+                      {(qObj.options || []).length > 2 && (
+                        <button onClick={() => {
+                          const nq = [...classQuestions]
+                          const newOpts = (qObj.options || []).filter((_, k) => k !== j)
+                          const newCorrect = qObj.correct === j ? 0 : qObj.correct > j ? qObj.correct - 1 : qObj.correct
+                          nq[i] = { ...qObj, options: newOpts, correct: newCorrect }
+                          setClassQuestions(nq)
+                        }} style={{ ...btn(C.red), padding: '4px 8px', fontSize: 11 }}>X</button>
+                      )}
+                    </div>
+                  ))}
+                  {(qObj.options || []).length < 6 && (
+                    <button onClick={() => {
+                      const nq = [...classQuestions]
+                      nq[i] = { ...qObj, options: [...(qObj.options || []), ''] }
+                      setClassQuestions(nq)
+                    }} style={{ ...btn(C.surface), fontSize: 11, padding: '4px 12px', marginTop: 4 }}>+ ADD OPTION</button>
+                  )}
+                </div>
+              )
+            })}
+            <button onClick={() => setClassQuestions([...classQuestions, { question: '', options: ['', ''], correct: 0 }])} style={{ ...btn(C.surface), marginBottom: 24 }}>+ ADD QUESTION</button>
 
             <h2 style={{ fontSize: 20, fontWeight: 800, textTransform: 'uppercase', marginBottom: 8 }}>ABOUT ME QUESTIONS</h2>
             <p style={{ fontSize: 12, color: '#555', marginBottom: 16 }}>These show during login when students fill their slam book. Leave empty for defaults. "What would your friends call you?" is always added automatically.</p>

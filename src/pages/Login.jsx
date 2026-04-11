@@ -145,7 +145,7 @@ export default function Login() {
       const settings = await getSettings()
       if (settings?.classQuestions && settings.classQuestions.length > 0) {
         setClassQuestions(settings.classQuestions)
-        setQuizAnswers(settings.classQuestions.map(() => ''))
+        setQuizAnswers(settings.classQuestions.map(() => -1))
       }
       // Build slam questions: admin-defined or defaults + fixed title question
       const customQs = settings?.slamQuestions?.length > 0 ? settings.slamQuestions : DEFAULT_SLAM_QUESTIONS
@@ -160,14 +160,14 @@ export default function Login() {
     }
   }
 
-  // STEP 1 — Class Quiz
+  // STEP 1 — Class Quiz (MCQ)
   async function handleQuizSubmit() {
-    const allFilled = quizAnswers.every(a => a.trim())
-    if (!allFilled) return shakeError("ANSWER ALL OF THEM")
+    const allFilled = quizAnswers.every(a => a >= 0)
+    if (!allFilled) return shakeError("PICK AN ANSWER FOR EACH")
     setLoading(true)
     const allCorrect = classQuestions.every((q, i) => {
-      const correct = (typeof q === 'object' ? q.answer : '').trim().toLowerCase()
-      return quizAnswers[i].trim().toLowerCase() === correct
+      const correct = typeof q === 'object' && Array.isArray(q.options) ? q.correct : -1
+      return quizAnswers[i] === correct
     })
     if (!allCorrect) {
       const attempts = await recordFailedAttempt(rollNo.trim().toUpperCase())
@@ -355,25 +355,41 @@ export default function Login() {
             </div>
           )}
 
-          {/* STEP 1 — Class Quiz */}
+          {/* STEP 1 — Class Quiz (MCQ) */}
           {step === 1 && (
             <div>
               <p style={{ fontSize: 14, color: '#555', marginBottom: 16 }}>hey {student?.name?.split(' ')[0]}! answer these to get in.</p>
-              {classQuestions.map((q, i) => (
-                <div key={i} style={{ marginBottom: 16 }}>
-                  <label style={{ fontSize: 14, fontWeight: 700, display: 'block', marginBottom: 6 }}>
-                    {typeof q === 'object' ? q.question : q}
-                  </label>
-                  <input
-                    value={quizAnswers[i]}
-                    onChange={e => { const na = [...quizAnswers]; na[i] = e.target.value; setQuizAnswers(na) }}
-                    onKeyDown={e => e.key === 'Enter' && i === classQuestions.length - 1 && handleQuizSubmit()}
-                    placeholder="your answer"
-                    style={inputStyle}
-                    autoFocus={i === 0}
-                  />
-                </div>
-              ))}
+              {classQuestions.map((q, i) => {
+                const qObj = typeof q === 'object' ? q : { question: q, options: [], correct: -1 }
+                return (
+                  <div key={i} style={{ marginBottom: 20 }}>
+                    <label style={{ fontSize: 14, fontWeight: 700, display: 'block', marginBottom: 8 }}>
+                      {qObj.question || q}
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {(qObj.options || []).map((opt, j) => (
+                        <div
+                          key={j}
+                          onClick={() => { const na = [...quizAnswers]; na[i] = j; setQuizAnswers(na) }}
+                          style={{
+                            padding: '10px 14px',
+                            border: `2px solid ${quizAnswers[i] === j ? C.yellow : C.border}`,
+                            background: quizAnswers[i] === j ? C.yellow : C.surface,
+                            cursor: 'pointer',
+                            fontWeight: 600,
+                            fontSize: 14,
+                            fontFamily: 'DM Sans, sans-serif',
+                            transition: 'all 0.1s',
+                            boxShadow: quizAnswers[i] === j ? `3px 3px 0 ${C.border}` : 'none'
+                          }}
+                        >
+                          {opt}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
               <button
                 onClick={handleQuizSubmit}
                 onMouseDown={e => handleBtnHover(e, true)}
