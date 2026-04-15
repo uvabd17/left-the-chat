@@ -135,13 +135,44 @@ export default function AdminPanel() {
     setLoading(false)
   }
 
-  function handlePhotoSelect(e) {
+  async function compressImage(file, maxDim = 800, quality = 0.82) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onerror = () => reject(new Error('READ FAILED'))
+      reader.onload = (ev) => {
+        const img = new Image()
+        img.onerror = () => reject(new Error('BAD IMAGE'))
+        img.onload = () => {
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+          const w = Math.round(img.width * scale)
+          const h = Math.round(img.height * scale)
+          const canvas = document.createElement('canvas')
+          canvas.width = w; canvas.height = h
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+          canvas.toBlob(blob => {
+            if (!blob) return reject(new Error('COMPRESS FAILED'))
+            const base = (file.name || 'photo').replace(/\.[^.]+$/, '')
+            resolve(new File([blob], `${base}.jpg`, { type: 'image/jpeg' }))
+          }, 'image/jpeg', quality)
+        }
+        img.src = ev.target.result
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function handlePhotoSelect(e) {
     const file = e.target.files[0]
     if (!file) return
-    setNewStudentPhoto(file)
-    const reader = new FileReader()
-    reader.onload = (ev) => setNewStudentPhotoPreview(ev.target.result)
-    reader.readAsDataURL(file)
+    try {
+      const compressed = await compressImage(file)
+      setNewStudentPhoto(compressed)
+      const reader = new FileReader()
+      reader.onload = (ev) => setNewStudentPhotoPreview(ev.target.result)
+      reader.readAsDataURL(compressed)
+    } catch {
+      alert('COULD NOT PROCESS IMAGE. TRY ANOTHER.')
+    }
   }
 
   async function handleAddStudent() {
@@ -157,7 +188,11 @@ export default function AdminPanel() {
       photoURL: null
     })
     if (newStudentPhoto) {
-      await uploadPhoto(newStudent.rollNo, newStudentPhoto)
+      try {
+        await uploadPhoto(newStudent.rollNo, newStudentPhoto)
+      } catch (err) {
+        alert(`PHOTO UPLOAD FAILED: ${err?.message || 'UNKNOWN'}`)
+      }
     }
     setNewStudent({ rollNo: '', name: '', code: '' })
     setStudentQuestions([{ question: '', answer: '' }])
@@ -167,8 +202,23 @@ export default function AdminPanel() {
   }
 
   async function handlePhotoUpload(rollNo, file) {
-    await uploadPhoto(rollNo, file)
-    loadData()
+    try {
+      const compressed = await compressImage(file)
+      await uploadPhoto(rollNo, compressed)
+      loadData()
+    } catch (err) {
+      alert(`PHOTO UPLOAD FAILED: ${err?.message || 'UNKNOWN'}`)
+    }
+  }
+
+  async function handleDeleteStudent(rollNo, name) {
+    if (!confirm(`DELETE ${name} (${rollNo})? This cannot be undone.`)) return
+    try {
+      await deleteStudent(rollNo)
+      loadData()
+    } catch (err) {
+      alert(`DELETE FAILED: ${err?.message || 'UNKNOWN'}`)
+    }
   }
 
   async function handleBan(rollNo, banned) {
@@ -402,6 +452,7 @@ export default function AdminPanel() {
                     {s.banned ? 'UNBAN' : 'BAN'}
                   </button>
                   <button onClick={() => handleResetLockout(s.id)} style={btn(C.orange)}>RESET LOCK</button>
+                  <button onClick={() => handleDeleteStudent(s.id, s.name)} style={btn(C.red)}>DELETE</button>
                 </div>
               </div>
             ))}
