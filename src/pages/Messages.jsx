@@ -157,7 +157,7 @@ export default function Messages() {
     setMsgText('')
     if (stu.questions && stu.questions.length > 0) {
       setQuizMode(true)
-      setQuizAnswers(stu.questions.map(() => ''))
+      setQuizAnswers(stu.questions.map(q => (typeof q === 'object' && Array.isArray(q.options)) ? -1 : ''))
       setQuizError('')
     } else {
       setQuizMode(false)
@@ -167,8 +167,11 @@ export default function Messages() {
 
   function handleQuizSubmit() {
     const allCorrect = selectedRecipient.questions.every((q, i) => {
+      if (typeof q === 'object' && Array.isArray(q.options)) {
+        return quizAnswers[i] === q.correct
+      }
       const expected = (typeof q === 'object' ? q.answer : q).trim().toLowerCase()
-      return quizAnswers[i].trim().toLowerCase() === expected
+      return (quizAnswers[i] || '').trim().toLowerCase() === expected
     })
     if (!allCorrect) {
       setQuizError("YOU DON'T KNOW THEM LIKE THAT")
@@ -367,22 +370,48 @@ export default function Messages() {
               <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 12, color: '#555' }}>
                 answer their questions to unlock:
               </p>
-              {selectedRecipient.questions.map((q, i) => (
-                <div key={i} style={{ marginBottom: 12 }}>
-                  <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 4 }}>
-                    {typeof q === 'object' ? q.question : q}
-                  </label>
-                  <input
-                    value={quizAnswers[i]}
-                    onChange={e => { const na = [...quizAnswers]; na[i] = e.target.value; setQuizAnswers(na) }}
-                    style={{
-                      background: C.bg, border: `2px solid ${C.border}`,
-                      padding: '10px 14px', fontSize: 15, fontFamily: 'DM Sans, sans-serif',
-                      width: '100%', color: '#000'
-                    }}
-                  />
-                </div>
-              ))}
+              {selectedRecipient.questions.map((q, i) => {
+                const isMCQ = typeof q === 'object' && Array.isArray(q.options)
+                return (
+                  <div key={i} style={{ marginBottom: 16 }}>
+                    <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 6 }}>
+                      {typeof q === 'object' ? q.question : q}
+                    </label>
+                    {isMCQ ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {q.options.map((opt, j) => (
+                          <div
+                            key={j}
+                            onClick={() => { const na = [...quizAnswers]; na[i] = j; setQuizAnswers(na) }}
+                            style={{
+                              padding: '10px 14px',
+                              border: `2px solid ${quizAnswers[i] === j ? C.yellow : C.border}`,
+                              background: quizAnswers[i] === j ? C.yellow : C.surface,
+                              cursor: 'pointer',
+                              fontWeight: 600,
+                              fontSize: 14,
+                              fontFamily: 'DM Sans, sans-serif',
+                              boxShadow: quizAnswers[i] === j ? `3px 3px 0 ${C.border}` : 'none'
+                            }}
+                          >
+                            {opt}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <input
+                        value={quizAnswers[i] || ''}
+                        onChange={e => { const na = [...quizAnswers]; na[i] = e.target.value; setQuizAnswers(na) }}
+                        style={{
+                          background: C.bg, border: `2px solid ${C.border}`,
+                          padding: '10px 14px', fontSize: 15, fontFamily: 'DM Sans, sans-serif',
+                          width: '100%', color: '#000'
+                        }}
+                      />
+                    )}
+                  </div>
+                )
+              })}
               {quizError && (
                 <p style={{
                   background: C.red, border: `2px solid ${C.border}`,

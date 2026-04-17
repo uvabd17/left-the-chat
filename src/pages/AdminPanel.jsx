@@ -53,7 +53,8 @@ export default function AdminPanel() {
   // Student form
   const [newStudent, setNewStudent] = useState({ rollNo: '', name: '', code: '' })
   const [editingStudent, setEditingStudent] = useState(null)
-  const [studentQuestions, setStudentQuestions] = useState([{ question: '', answer: '' }])
+  const [studentQuestions, setStudentQuestions] = useState([{ question: '', options: ['', ''], correct: 0 }])
+  const [editQuestions, setEditQuestions] = useState([])
   const [newStudentPhoto, setNewStudentPhoto] = useState(null)
   const [newStudentPhotoPreview, setNewStudentPhotoPreview] = useState(null)
 
@@ -180,7 +181,7 @@ export default function AdminPanel() {
     await addStudent(newStudent.rollNo, {
       name: newStudent.name,
       code: newStudent.code,
-      questions: studentQuestions.filter(q => q.question?.trim() && q.answer?.trim()),
+      questions: studentQuestions.filter(q => q.question?.trim() && Array.isArray(q.options) && q.options.every(o => o?.trim())),
       banned: false,
       attempts: 0,
       lockedUntil: null,
@@ -195,7 +196,7 @@ export default function AdminPanel() {
       }
     }
     setNewStudent({ rollNo: '', name: '', code: '' })
-    setStudentQuestions([{ question: '', answer: '' }])
+    setStudentQuestions([{ question: '', options: ['', ''], correct: 0 }])
     setNewStudentPhoto(null)
     setNewStudentPhotoPreview(null)
     loadData()
@@ -208,6 +209,30 @@ export default function AdminPanel() {
       loadData()
     } catch (err) {
       alert(`PHOTO UPLOAD FAILED: ${err?.message || 'UNKNOWN'}`)
+    }
+  }
+
+  function handleStartEditQuestions(student) {
+    const existing = Array.isArray(student.questions) ? student.questions : []
+    const converted = existing.map(q => {
+      if (typeof q === 'object' && Array.isArray(q.options)) return q
+      const ans = typeof q === 'object' ? (q.answer || '') : ''
+      const ques = typeof q === 'object' ? (q.question || '') : q
+      return { question: ques, options: [ans, ''], correct: 0 }
+    })
+    setEditingStudent(student.id)
+    setEditQuestions(converted.length > 0 ? converted : [{ question: '', options: ['', ''], correct: 0 }])
+  }
+
+  async function handleSaveEditQuestions() {
+    const clean = editQuestions.filter(q => q.question?.trim() && Array.isArray(q.options) && q.options.every(o => o?.trim()))
+    try {
+      await updateStudent(editingStudent, { questions: clean })
+      setEditingStudent(null)
+      setEditQuestions([])
+      loadData()
+    } catch (err) {
+      alert(`SAVE FAILED: ${err?.message || 'UNKNOWN'}`)
     }
   }
 
@@ -362,15 +387,49 @@ export default function AdminPanel() {
                 </div>
               </div>
 
-              <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, textTransform: 'uppercase' }}>Personal questions (for message unlocking):</p>
-              {studentQuestions.map((q, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                  <input placeholder="Question" value={typeof q === 'object' ? q.question || '' : q} onChange={e => { const nq = [...studentQuestions]; nq[i] = { question: e.target.value, answer: typeof q === 'object' ? q.answer || '' : '' }; setStudentQuestions(nq) }} style={{ ...input, flex: 2 }} />
-                  <input placeholder="Answer" value={typeof q === 'object' ? q.answer || '' : ''} onChange={e => { const nq = [...studentQuestions]; nq[i] = { question: typeof q === 'object' ? q.question || '' : q, answer: e.target.value }; setStudentQuestions(nq) }} style={{ ...input, flex: 1 }} />
-                  <button onClick={() => setStudentQuestions(studentQuestions.filter((_, j) => j !== i))} style={btn(C.red)}>X</button>
-                </div>
-              ))}
-              <button onClick={() => setStudentQuestions([...studentQuestions, { question: '', answer: '' }])} style={{ ...btn(C.surface), marginBottom: 12, fontSize: 13 }}>+ ADD QUESTION</button>
+              <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8, textTransform: 'uppercase' }}>Personal questions (MCQ — 2 options, pick the correct one):</p>
+              {studentQuestions.map((q, i) => {
+                const qObj = typeof q === 'object' && Array.isArray(q.options) ? q : { question: (q?.question || ''), options: [(q?.answer || ''), ''], correct: 0 }
+                return (
+                  <div key={i} style={{ border: `2px solid ${C.border}`, padding: 12, marginBottom: 10, background: C.bg }}>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                      <input placeholder="Question" value={qObj.question || ''} onChange={e => {
+                        const nq = [...studentQuestions]
+                        nq[i] = { ...qObj, question: e.target.value }
+                        setStudentQuestions(nq)
+                      }} style={{ ...input, flex: 1, fontWeight: 700 }} />
+                      <button onClick={() => setStudentQuestions(studentQuestions.filter((_, j) => j !== i))} style={btn(C.red)}>X</button>
+                    </div>
+                    {[0, 1].map(j => (
+                      <div key={j} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                        <div
+                          onClick={() => {
+                            const nq = [...studentQuestions]
+                            nq[i] = { ...qObj, correct: j }
+                            setStudentQuestions(nq)
+                          }}
+                          style={{
+                            width: 20, height: 20, borderRadius: '50%', cursor: 'pointer', flexShrink: 0,
+                            border: `2px solid ${qObj.correct === j ? C.green : C.border}`,
+                            background: qObj.correct === j ? C.green : 'transparent',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}
+                        >
+                          {qObj.correct === j && <span style={{ color: '#fff', fontSize: 11, fontWeight: 900 }}>✓</span>}
+                        </div>
+                        <input placeholder={`Option ${j + 1}${j === 0 ? ' (correct answer)' : ' (distractor)'}`} value={qObj.options?.[j] || ''} onChange={e => {
+                          const nq = [...studentQuestions]
+                          const newOpts = [...(qObj.options || ['', ''])]
+                          newOpts[j] = e.target.value
+                          nq[i] = { ...qObj, options: newOpts }
+                          setStudentQuestions(nq)
+                        }} style={{ ...input, flex: 1, background: qObj.correct === j ? C.green + '22' : input.background }} />
+                      </div>
+                    ))}
+                  </div>
+                )
+              })}
+              <button onClick={() => setStudentQuestions([...studentQuestions, { question: '', options: ['', ''], correct: 0 }])} style={{ ...btn(C.surface), marginBottom: 12, fontSize: 13 }}>+ ADD QUESTION</button>
               <br />
               <button onClick={handleAddStudent} style={btn(C.green)}>ADD STUDENT</button>
             </div>
@@ -431,7 +490,8 @@ export default function AdminPanel() {
 
             {/* Student list */}
             {filtered.map(s => (
-              <div key={s.id} style={{ ...card, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+              <div key={s.id}>
+              <div style={{ ...card, marginBottom: editingStudent === s.id ? 0 : 12, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                 <div style={{ width: 72, height: 72, border: `2px solid ${C.border}`, background: C.pink, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 24, flexShrink: 0, overflow: 'hidden' }}>
                   {s.photoURL ? <img src={s.photoURL} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" /> : s.name?.charAt(0).toUpperCase()}
                 </div>
@@ -452,8 +512,61 @@ export default function AdminPanel() {
                     {s.banned ? 'UNBAN' : 'BAN'}
                   </button>
                   <button onClick={() => handleResetLockout(s.id)} style={btn(C.orange)}>RESET LOCK</button>
+                  <button onClick={() => editingStudent === s.id ? (setEditingStudent(null), setEditQuestions([])) : handleStartEditQuestions(s)} style={btn(C.purple)}>
+                    {editingStudent === s.id ? 'CANCEL' : `EDIT Q (${(s.questions || []).length})`}
+                  </button>
                   <button onClick={() => handleDeleteStudent(s.id, s.name)} style={btn(C.red)}>DELETE</button>
                 </div>
+              </div>
+              {editingStudent === s.id && (
+                <div style={{ ...card, marginBottom: 12, borderTop: 'none', background: C.bg }}>
+                  <p style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', marginBottom: 12, color: '#555' }}>
+                    EDIT PERSONAL QUESTIONS — MCQ FORMAT (old answers pre-filled, just add a distractor)
+                  </p>
+                  {editQuestions.map((q, i) => (
+                    <div key={i} style={{ border: `2px solid ${C.border}`, padding: 12, marginBottom: 10, background: C.surface }}>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                        <input placeholder="Question" value={q.question || ''} onChange={e => {
+                          const nq = [...editQuestions]
+                          nq[i] = { ...q, question: e.target.value }
+                          setEditQuestions(nq)
+                        }} style={{ ...input, flex: 1, fontWeight: 700 }} />
+                        <button onClick={() => setEditQuestions(editQuestions.filter((_, j) => j !== i))} style={btn(C.red)}>X</button>
+                      </div>
+                      {[0, 1].map(j => (
+                        <div key={j} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                          <div
+                            onClick={() => {
+                              const nq = [...editQuestions]
+                              nq[i] = { ...q, correct: j }
+                              setEditQuestions(nq)
+                            }}
+                            style={{
+                              width: 20, height: 20, borderRadius: '50%', cursor: 'pointer', flexShrink: 0,
+                              border: `2px solid ${q.correct === j ? C.green : C.border}`,
+                              background: q.correct === j ? C.green : 'transparent',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}
+                          >
+                            {q.correct === j && <span style={{ color: '#fff', fontSize: 11, fontWeight: 900 }}>✓</span>}
+                          </div>
+                          <input placeholder={`Option ${j + 1}`} value={q.options?.[j] || ''} onChange={e => {
+                            const nq = [...editQuestions]
+                            const newOpts = [...(q.options || ['', ''])]
+                            newOpts[j] = e.target.value
+                            nq[i] = { ...q, options: newOpts }
+                            setEditQuestions(nq)
+                          }} style={{ ...input, flex: 1, background: q.correct === j ? C.green + '22' : input.background }} />
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button onClick={() => setEditQuestions([...editQuestions, { question: '', options: ['', ''], correct: 0 }])} style={{ ...btn(C.surface), fontSize: 13 }}>+ ADD QUESTION</button>
+                    <button onClick={handleSaveEditQuestions} style={btn(C.green)}>SAVE</button>
+                  </div>
+                </div>
+              )}
               </div>
             ))}
             {filtered.length === 0 && (
