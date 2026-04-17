@@ -51,6 +51,9 @@ export async function addStudent(rollNo, data) {
 }
 
 export async function deleteStudent(rollNo) {
+  try {
+    await storage.deleteFile(BUCKET_ID, rollNo)
+  } catch { /* ignore if no photo exists */ }
   await databases.deleteDocument(DB_ID, C.students, rollNo)
 }
 
