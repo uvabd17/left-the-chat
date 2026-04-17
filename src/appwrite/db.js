@@ -52,8 +52,15 @@ export async function addStudent(rollNo, data) {
 
 export async function deleteStudent(rollNo) {
   try {
-    await storage.deleteFile(BUCKET_ID, rollNo)
-  } catch { /* ignore if no photo exists */ }
+    const student = await getStudent(rollNo)
+    const oldUrl = student?.photoURL || ''
+    const oldIdMatch = oldUrl.match(/\/files\/([^/]+)\/view/)
+    const oldFileId = oldIdMatch ? oldIdMatch[1] : rollNo
+    try { await storage.deleteFile(BUCKET_ID, oldFileId) } catch { /* ignore */ }
+    if (oldFileId !== rollNo) {
+      try { await storage.deleteFile(BUCKET_ID, rollNo) } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
   await databases.deleteDocument(DB_ID, C.students, rollNo)
 }
 
@@ -357,14 +364,21 @@ export async function getAllFutureSelfMessages() {
 // ─── PHOTOS (STORAGE) ───
 
 export async function uploadPhoto(rollNo, file) {
+  const student = await getStudent(rollNo)
+  const oldUrl = student?.photoURL || ''
+  const oldIdMatch = oldUrl.match(/\/files\/([^/]+)\/view/)
+  const oldFileId = oldIdMatch ? oldIdMatch[1] : rollNo
   try {
-    await storage.deleteFile(BUCKET_ID, rollNo)
+    await storage.deleteFile(BUCKET_ID, oldFileId)
   } catch { /* ignore if not exists */ }
-  await storage.createFile(BUCKET_ID, rollNo, file)
-  const base = storage.getFileView(BUCKET_ID, rollNo).toString()
-  const bust = `${base}${base.includes('?') ? '&' : '?'}v=${Date.now()}`
-  await updateStudent(rollNo, { photoURL: bust })
-  return bust
+  if (oldFileId !== rollNo) {
+    try { await storage.deleteFile(BUCKET_ID, rollNo) } catch { /* ignore */ }
+  }
+  const newFileId = `${rollNo}_${Date.now()}`
+  await storage.createFile(BUCKET_ID, newFileId, file)
+  const url = storage.getFileView(BUCKET_ID, newFileId).toString()
+  await updateStudent(rollNo, { photoURL: url })
+  return url
 }
 
 export function getPhotoURL(rollNo) {
