@@ -361,9 +361,10 @@ export async function uploadPhoto(rollNo, file) {
     await storage.deleteFile(BUCKET_ID, rollNo)
   } catch { /* ignore if not exists */ }
   await storage.createFile(BUCKET_ID, rollNo, file)
-  const url = storage.getFileView(BUCKET_ID, rollNo)
-  await updateStudent(rollNo, { photoURL: url.toString() })
-  return url.toString()
+  const base = storage.getFileView(BUCKET_ID, rollNo).toString()
+  const bust = `${base}${base.includes('?') ? '&' : '?'}v=${Date.now()}`
+  await updateStudent(rollNo, { photoURL: bust })
+  return bust
 }
 
 export function getPhotoURL(rollNo) {
