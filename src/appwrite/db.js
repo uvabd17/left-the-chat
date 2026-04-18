@@ -2,6 +2,21 @@ import { databases, storage, ID, Query, DB_ID, BUCKET_ID, COLLECTIONS } from './
 
 const C = COLLECTIONS
 
+function hashString(input) {
+  let h1 = 0x811c9dc5
+  let h2 = 0x01000193
+  for (let i = 0; i < input.length; i++) {
+    const code = input.charCodeAt(i)
+    h1 ^= code
+    h1 = Math.imul(h1, 0x01000193)
+    h2 ^= code
+    h2 = Math.imul(h2, 0x27d4eb2d)
+  }
+  const a = (h1 >>> 0).toString(16).padStart(8, '0')
+  const b = (h2 >>> 0).toString(16).padStart(8, '0')
+  return `${a}${b}`
+}
+
 // Helper: parse JSON string fields safely
 function parseJSON(val, fallback = []) {
   if (!val) return fallback
@@ -79,6 +94,76 @@ export async function recordFailedAttempt(rollNo) {
 
 export async function resetAttempts(rollNo) {
   await updateStudent(rollNo, { attempts: 0, lockedUntil: null })
+}
+
+function normalizePinFieldError(e) {
+  if (e?.code === 400) {
+    throw new Error('PIN fields are missing in students collection. Add pinHash, pinSetupAt, pinAttempts, pinLockedUntil in Appwrite first.')
+  }
+  throw e
+}
+
+export async function setStudentPin(rollNo, pinHash) {
+  try {
+    await updateStudent(rollNo, {
+      pinHash,
+      pinSetupAt: new Date().toISOString(),
+      pinAttempts: 0,
+      pinLockedUntil: null
+    })
+  } catch (e) {
+    normalizePinFieldError(e)
+  }
+}
+
+export async function clearStudentPin(rollNo) {
+  try {
+    await updateStudent(rollNo, {
+      pinHash: null,
+      pinSetupAt: null,
+      pinAttempts: 0,
+      pinLockedUntil: null
+    })
+  } catch (e) {
+    normalizePinFieldError(e)
+  }
+}
+
+export async function resetPinFailures(rollNo) {
+  try {
+    await updateStudent(rollNo, { pinAttempts: 0, pinLockedUntil: null })
+  } catch (e) {
+    normalizePinFieldError(e)
+  }
+}
+
+export async function recordPinFailure(rollNo) {
+  const student = await getStudent(rollNo)
+  if (!student) return { locked: false, attemptsLeft: 0 }
+
+  const lockEnd = student.pinLockedUntil ? new Date(student.pinLockedUntil) : null
+  if (lockEnd && lockEnd > new Date()) {
+    return { locked: true, attemptsLeft: 0, lockedUntil: lockEnd.toISOString() }
+  }
+
+  const attempts = (student.pinAttempts || 0) + 1
+  if (attempts >= 5) {
+    const lockedUntil = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+    try {
+      await updateStudent(rollNo, { pinAttempts: 0, pinLockedUntil: lockedUntil })
+    } catch (e) {
+      normalizePinFieldError(e)
+    }
+    return { locked: true, attemptsLeft: 0, lockedUntil }
+  }
+
+  try {
+    await updateStudent(rollNo, { pinAttempts: attempts, pinLockedUntil: null })
+  } catch (e) {
+    normalizePinFieldError(e)
+  }
+
+  return { locked: false, attemptsLeft: 5 - attempts }
 }
 
 // ─── SETTINGS ───
@@ -261,13 +346,25 @@ export async function getAllMessagesMeta() {
 // ─── VOTES (AWARDS) ───
 
 export async function saveVote(categoryId, voterRollNo, nomineeRollNo) {
-  const voteId = `${categoryId}_${voterRollNo}`
-  await databases.createDocument(DB_ID, C.votes, voteId, {
-    category: categoryId,
-    voter: voterRollNo,
-    nominee: nomineeRollNo,
-    createdAt: new Date().toISOString()
-  })
+  const existing = await databases.listDocuments(DB_ID, C.votes, [
+    Query.equal('category', categoryId),
+    Query.equal('voter', voterRollNo),
+    Query.limit(1)
+  ])
+  if (existing.total > 0) return
+
+  const voteId = `v_${hashString(`${categoryId}__${voterRollNo}`)}`
+  try {
+    await databases.createDocument(DB_ID, C.votes, voteId, {
+      category: categoryId,
+      voter: voterRollNo,
+      nominee: nomineeRollNo,
+      createdAt: new Date().toISOString()
+    })
+  } catch (e) {
+    if (e?.code === 409) return
+    throw e
+  }
 }
 
 export async function getVotesForCategory(categoryId) {
@@ -330,6 +427,16 @@ export async function getAllUnsent() {
     Query.limit(200)
   ])
   return res.documents.map(d => ({ id: d.$id, ...d }))
+}
+
+export async function getLatestUnsent() {
+  const res = await databases.listDocuments(DB_ID, C.unsent, [
+    Query.orderDesc('createdAt'),
+    Query.limit(1)
+  ])
+  if (!res.documents.length) return null
+  const d = res.documents[0]
+  return { id: d.$id, ...d }
 }
 
 export async function deleteUnsent(id) {

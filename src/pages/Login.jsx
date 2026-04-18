@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getStudent, getSettings, recordFailedAttempt, resetAttempts, saveSlamBook } from '../appwrite/db'
-import { getSession, saveSession } from '../utils/auth'
+import { getSession, saveSession, clearSession, isPinTrusted } from '../utils/auth'
 
 const C = {
   bg: '#FFF5E1', surface: '#FFFFFF', border: '#000000',
@@ -87,8 +87,21 @@ export default function Login() {
   const timerRef = useRef(null)
 
   useEffect(() => {
-    const session = getSession()
-    if (session) navigate('/dashboard', { replace: true })
+    async function checkSession() {
+      const session = getSession()
+      if (!session) return
+      const s = await getStudent(session.rollNo)
+      if (!s) {
+        clearSession()
+        return
+      }
+      if (isPinTrusted(session.rollNo)) {
+        navigate('/dashboard', { replace: true })
+        return
+      }
+      navigate(s.pinHash ? '/pin-verify' : '/pin-setup', { replace: true })
+    }
+    checkSession()
   }, [])
 
   useEffect(() => {
@@ -208,7 +221,7 @@ export default function Login() {
     saveSession(rollNo.trim().toUpperCase(), student.name)
     setShowConfetti(true)
     setLoading(false)
-    setTimeout(() => navigate('/dashboard', { replace: true }), 1200)
+    setTimeout(() => navigate(student?.pinHash ? '/pin-verify' : '/pin-setup', { replace: true }), 1200)
   }
 
   const totalSteps = student?.slamBookFilled ? 2 : 3

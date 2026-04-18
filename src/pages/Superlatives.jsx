@@ -98,19 +98,24 @@ export default function Superlatives() {
     const pollId = `poll_${pollIndex}`
     if (myVotes[pollId]) return
     setVoting(pollId)
-    await saveSuperlativeVote(pollId, session.rollNo, winnerRollNo)
-    setMyVotes(prev => ({ ...prev, [pollId]: winnerRollNo }))
+    try {
+      await saveSuperlativeVote(pollId, session.rollNo, winnerRollNo)
+      setMyVotes(prev => ({ ...prev, [pollId]: winnerRollNo }))
 
-    // Fetch updated counts
-    const votes = await getSuperlativeVotes(pollId)
-    const poll = polls[pollIndex]
-    let aCount = 0, bCount = 0
-    votes.forEach(v => {
-      if (v.winner === poll.optionA) aCount++
-      else if (v.winner === poll.optionB) bCount++
-    })
-    setVoteCounts(prev => ({ ...prev, [pollId]: { a: aCount, b: bCount, total: aCount + bCount } }))
-    setVoting(null)
+      // Fetch updated counts
+      const votes = await getSuperlativeVotes(pollId)
+      const poll = polls[pollIndex]
+      let aCount = 0, bCount = 0
+      votes.forEach(v => {
+        if (v.winner === poll.optionA) aCount++
+        else if (v.winner === poll.optionB) bCount++
+      })
+      setVoteCounts(prev => ({ ...prev, [pollId]: { a: aCount, b: bCount, total: aCount + bCount } }))
+    } catch {
+      alert('VOTE FAILED. PLEASE TRY AGAIN.')
+    } finally {
+      setVoting(null)
+    }
   }
 
   if (loading) {

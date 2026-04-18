@@ -172,10 +172,15 @@ export default function Awards() {
   async function handleVote(nomineeRollNo) {
     if (myVote || voting) return
     setVoting(true)
-    await saveVote(activeCategory, session.rollNo, nomineeRollNo)
-    setMyVote(nomineeRollNo)
-    setConfirmTarget(null)
-    setVoting(false)
+    try {
+      await saveVote(activeCategory, session.rollNo, nomineeRollNo)
+      setMyVote(nomineeRollNo)
+      setConfirmTarget(null)
+    } catch {
+      alert('VOTE FAILED. PLEASE TRY AGAIN.')
+    } finally {
+      setVoting(false)
+    }
   }
 
   const filteredStudents = students.filter(s =>

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getSession, clearSession, hasSeenOnboarding, markOnboardingSeen } from '../utils/auth'
-import { getUnreadCount, getStudent, getSlamBook, parseSlamBook } from '../appwrite/db'
+import { getUnreadCount, getStudent, getSlamBook, parseSlamBook, getSettings, getLatestUnsent } from '../appwrite/db'
 
 const C = {
   bg: '#FFF5E1', surface: '#FFFFFF', border: '#000000',
@@ -48,6 +48,67 @@ const FEATURES = [
   }
 ]
 
+const POLL_MS = 45000
+const SEEN_KEY = 'farewell_notif_seen_v1'
+
+function digest(value) {
+  const input = String(value || '')
+  let h = 5381
+  for (let i = 0; i < input.length; i++) {
+    h = ((h << 5) + h) + input.charCodeAt(i)
+  }
+  return (h >>> 0).toString(16)
+}
+
+function readSeenSet() {
+  try {
+    const raw = sessionStorage.getItem(SEEN_KEY)
+    if (!raw) return new Set()
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed)
+  } catch {
+    return new Set()
+  }
+}
+
+function writeSeenSet(seen) {
+  try {
+    sessionStorage.setItem(SEEN_KEY, JSON.stringify(Array.from(seen)))
+  } catch {
+    // Ignore storage write issues; notifications still function in-memory.
+  }
+}
+
+function sanitizeSnippet(text, maxLen = 96) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim()
+  if (clean.length <= maxLen) return clean
+  return `${clean.slice(0, maxLen)}...`
+}
+
+function buildSnapshot(unreadCount, settings, latestUnsent) {
+  const awards = settings?.awardsCategories
+  let activeCategory = null
+  if (awards && typeof awards === 'object' && !Array.isArray(awards)) {
+    activeCategory = awards.active || null
+  } else if (typeof awards === 'string') {
+    activeCategory = awards || null
+  }
+  const revealDate = settings?.awardsRevealDate || null
+  const isRevealed = revealDate ? new Date(revealDate) <= new Date() : false
+  const superlativesSig = digest(JSON.stringify(settings?.superlatives || []))
+
+  return {
+    unreadCount,
+    activeCategory,
+    revealDate,
+    isRevealed,
+    superlativesSig,
+    latestUnsentId: latestUnsent?.id || null,
+    latestUnsentText: latestUnsent?.text || ''
+  }
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const [session, setSession] = useState(null)
@@ -57,20 +118,107 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [onboardingStep, setOnboardingStep] = useState(-1)
   const [cardsVisible, setCardsVisible] = useState(false)
+  const [toastQueue, setToastQueue] = useState([])
+  const [activeToast, setActiveToast] = useState(null)
+  const seenRef = useRef(readSeenSet())
+  const baselineRef = useRef(null)
+  const pollRef = useRef(null)
 
   useEffect(() => {
     const s = getSession()
     if (!s) { navigate('/login', { replace: true }); return }
     setSession(s)
     loadData(s.rollNo)
+
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current)
+        pollRef.current = null
+      }
+    }
   }, [])
+
+  useEffect(() => {
+    if (activeToast || toastQueue.length === 0) return
+    const [next, ...rest] = toastQueue
+    setActiveToast(next)
+    setToastQueue(rest)
+  }, [toastQueue, activeToast])
+
+  useEffect(() => {
+    if (!activeToast) return
+    const t = setTimeout(() => setActiveToast(null), 5000)
+    return () => clearTimeout(t)
+  }, [activeToast])
+
+  function enqueueToast(fingerprint, text, color = C.surface) {
+    const seen = seenRef.current
+    if (seen.has(fingerprint)) return
+    seen.add(fingerprint)
+    writeSeenSet(seen)
+    setToastQueue(prev => [...prev, { id: `${Date.now()}_${Math.random()}`, text, color }])
+  }
+
+  async function pollNotifications(rollNo) {
+    try {
+      const [count, settings, latestUnsent] = await Promise.all([
+        getUnreadCount(rollNo),
+        getSettings(),
+        getLatestUnsent()
+      ])
+
+      setUnreadCount(count)
+      const prev = baselineRef.current
+      const current = buildSnapshot(count, settings, latestUnsent)
+
+      if (!prev) {
+        baselineRef.current = current
+        return
+      }
+
+      if (current.unreadCount > prev.unreadCount) {
+        enqueueToast(`msg_${rollNo}_${current.unreadCount}`, 'NEW SECRET MESSAGE JUST DROPPED.', C.red)
+      }
+
+      if (current.activeCategory && current.activeCategory !== prev.activeCategory) {
+        enqueueToast(
+          `award_cat_${digest(`${current.activeCategory}_${current.revealDate || ''}`)}`,
+          `NEW CLASS VOTE: ${current.activeCategory.toUpperCase()}`,
+          C.yellow
+        )
+      }
+
+      if (!prev.isRevealed && current.isRevealed && current.activeCategory) {
+        enqueueToast(
+          `award_reveal_${digest(`${current.activeCategory}_${current.revealDate || ''}`)}`,
+          `RESULTS ARE OUT FOR ${current.activeCategory.toUpperCase()}.`,
+          C.yellow
+        )
+      }
+
+      if (current.superlativesSig !== prev.superlativesSig) {
+        enqueueToast(`sup_${current.superlativesSig}`, 'THIS OR THAT POLLS GOT UPDATED.', C.purple)
+      }
+
+      if (current.latestUnsentId && current.latestUnsentId !== prev.latestUnsentId) {
+        const snippet = sanitizeSnippet(current.latestUnsentText)
+        enqueueToast(`unsent_${current.latestUnsentId}`, `NEW JUST SAY IT: "${snippet}"`, C.blue)
+      }
+
+      baselineRef.current = current
+    } catch {
+      // Silent failure: background notifications should not block dashboard usage.
+    }
+  }
 
   async function loadData(rollNo) {
     try {
-      const [count, stu, slam] = await Promise.all([
+      const [count, stu, slam, settings, latestUnsent] = await Promise.all([
         getUnreadCount(rollNo),
         getStudent(rollNo),
-        getSlamBook(rollNo)
+        getSlamBook(rollNo),
+        getSettings(),
+        getLatestUnsent()
       ])
       setUnreadCount(count)
       setStudent(stu)
@@ -79,6 +227,13 @@ export default function Dashboard() {
         const titleQ = "In one word, what would your friends call you?"
         setTitle(parsed.answers[titleQ] || '')
       }
+
+      baselineRef.current = buildSnapshot(count, settings, latestUnsent)
+      if (pollRef.current) clearInterval(pollRef.current)
+      pollRef.current = setInterval(() => {
+        pollNotifications(rollNo)
+      }, POLL_MS)
+
       setLoading(false)
       setTimeout(() => setCardsVisible(true), 100)
 
@@ -122,6 +277,19 @@ export default function Dashboard() {
 
   return (
     <div style={{ minHeight: '100vh', background: C.bg, padding: 20 }}>
+      {activeToast && (
+        <div style={{
+          position: 'fixed', left: 16, bottom: 16, zIndex: 1200,
+          background: activeToast.color, border: `3px solid ${C.border}`,
+          boxShadow: `6px 6px 0 ${C.border}`,
+          padding: '12px 16px', maxWidth: 360,
+          fontSize: 13, fontWeight: 800, textTransform: 'uppercase',
+          animation: 'fadeUp 0.2s ease-out'
+        }}>
+          {activeToast.text}
+        </div>
+      )}
+
       {/* Onboarding overlay */}
       {onboardingStep >= 0 && (
         <div style={{

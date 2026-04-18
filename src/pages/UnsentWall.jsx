@@ -12,6 +12,24 @@ const C = {
 
 const CARD_COLORS = [C.pink, C.blue, C.yellow, C.purple, C.orange, C.green]
 
+function formatPostTime(createdAt) {
+  if (!createdAt) return 'just now'
+
+  // Support Firestore Timestamp-like objects and plain ISO strings from Appwrite.
+  const dateValue = typeof createdAt?.toDate === 'function'
+    ? createdAt.toDate()
+    : new Date(createdAt)
+
+  if (Number.isNaN(dateValue.getTime())) return 'just now'
+
+  return dateValue.toLocaleString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 function HomeButton({ navigate }) {
   return (
     <button
@@ -161,7 +179,7 @@ export default function UnsentWall() {
                   {post.text}
                 </p>
                 <p style={{ fontSize: 11, color: 'rgba(0,0,0,0.4)', marginTop: 8, fontWeight: 600 }}>
-                  {post.createdAt?.toDate?.()?.toLocaleDateString() || 'just now'}
+                  {formatPostTime(post.createdAt)}
                 </p>
               </div>
             ))}

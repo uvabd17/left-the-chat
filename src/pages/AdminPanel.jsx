@@ -4,7 +4,7 @@ import {
   getSettings, updateSettings, getAdminPassword, setAdminPassword,
   getReportedMessages, getAllMessagesMeta, markMessageRead,
   getAllUnsent, deleteUnsent, uploadPhoto, resetAllTestData,
-  getVotesForCategory
+  getVotesForCategory, clearStudentPin
 } from '../appwrite/db'
 
 const C = {
@@ -186,6 +186,10 @@ export default function AdminPanel() {
       attempts: 0,
       lockedUntil: null,
       slamBookFilled: false,
+      pinHash: null,
+      pinSetupAt: null,
+      pinAttempts: 0,
+      pinLockedUntil: null,
       photoURL: null
     })
     if (newStudentPhoto) {
@@ -254,6 +258,16 @@ export default function AdminPanel() {
   async function handleResetLockout(rollNo) {
     await updateStudent(rollNo, { attempts: 0, lockedUntil: null })
     loadData()
+  }
+
+  async function handleResetPin(rollNo, name) {
+    if (!confirm(`RESET PIN FOR ${name} (${rollNo})? They will be forced to set a new PIN on next login.`)) return
+    try {
+      await clearStudentPin(rollNo)
+      loadData()
+    } catch (err) {
+      alert(`PIN RESET FAILED: ${err?.message || 'UNKNOWN'}`)
+    }
   }
 
   async function handleSaveSettings() {
@@ -501,6 +515,7 @@ export default function AdminPanel() {
                     Code: {s.code} | Attempts: {s.attempts || 0}
                     {s.banned && <span style={{ color: C.red, fontWeight: 700 }}> | BANNED</span>}
                     {s.slamBookFilled && <span style={{ color: C.green, fontWeight: 700 }}> | SLAM DONE</span>}
+                    {s.pinHash && <span style={{ color: C.blue, fontWeight: 700 }}> | PIN SET</span>}
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -512,6 +527,7 @@ export default function AdminPanel() {
                     {s.banned ? 'UNBAN' : 'BAN'}
                   </button>
                   <button onClick={() => handleResetLockout(s.id)} style={btn(C.orange)}>RESET LOCK</button>
+                  <button onClick={() => handleResetPin(s.id, s.name)} style={btn(C.yellow)}>RESET PIN</button>
                   <button onClick={() => editingStudent === s.id ? (setEditingStudent(null), setEditQuestions([])) : handleStartEditQuestions(s)} style={btn(C.purple)}>
                     {editingStudent === s.id ? 'CANCEL' : `EDIT Q (${(s.questions || []).length})`}
                   </button>
