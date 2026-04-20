@@ -69,6 +69,7 @@ export default function AdminPanel() {
   const [awardsRevealDate, setAwardsRevealDate] = useState('')
   const [pastWinners, setPastWinners] = useState([])
   const [superlatives, setSuperlatives] = useState([])
+  const [superlativesRevealDate, setSuperlativesRevealDate] = useState('')
   const [slamQuestions, setSlamQuestions] = useState([])
   const [newAdminPw, setNewAdminPw] = useState('')
   const [testMode, setTestMode] = useState(false)
@@ -116,6 +117,7 @@ export default function AdminPanel() {
       }
       setAwardsRevealDate(settingsValue.awardsRevealDate || '')
       setSuperlatives(settingsValue.superlatives || [])
+      setSuperlativesRevealDate(settingsValue.superlativesRevealDate || '')
       setSlamQuestions(settingsValue.slamQuestions || [])
     } else {
       setClassQuestions([])
@@ -276,6 +278,7 @@ export default function AdminPanel() {
       awardsCategories: { active: activeAward, pastWinners },
       awardsRevealDate,
       superlatives,
+      superlativesRevealDate,
       slamQuestions
     })
     if (newAdminPw.trim()) {
@@ -710,6 +713,11 @@ export default function AdminPanel() {
                   <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6, padding: '6px 10px', background: C.bg, border: `2px solid ${C.border}` }}>
                     <span>🏆</span>
                     <span style={{ fontWeight: 800, flex: 1 }}>{pw.category}: {pw.name || pw.winner}</span>
+                    <button onClick={() => {
+                      if (activeAward && !confirm(`Replace current active category "${activeAward}"?`)) return
+                      setActiveAward(pw.category)
+                      setPastWinners(pastWinners.filter((_, j) => j !== i))
+                    }} style={{ ...btn(C.green), padding: '4px 10px', fontSize: 11 }}>RESTORE</button>
                     <button onClick={() => setPastWinners(pastWinners.filter((_, j) => j !== i))} style={{ ...btn(C.red), padding: '4px 10px', fontSize: 11 }}>X</button>
                   </div>
                 ))}
@@ -728,7 +736,13 @@ export default function AdminPanel() {
                 <button onClick={() => setSuperlatives(superlatives.filter((_, j) => j !== i))} style={{ ...btn(C.red), marginTop: 8, fontSize: 12 }}>REMOVE</button>
               </div>
             ))}
-            <button onClick={() => setSuperlatives([...superlatives, { question: '', optionA: '', optionB: '' }])} style={{ ...btn(C.surface), marginBottom: 24 }}>+ ADD POLL</button>
+            <button onClick={() => setSuperlatives([...superlatives, { question: '', optionA: '', optionB: '' }])} style={{ ...btn(C.surface), marginBottom: 12 }}>+ ADD POLL</button>
+            <div style={{ marginBottom: 24 }}>
+              <p style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 13, marginBottom: 8 }}>This or That — results reveal date</p>
+              <p style={{ fontSize: 11, color: '#555', marginBottom: 8 }}>Before this date, students only see "locked in" after voting. On this date, everyone sees vote percentages.</p>
+              <input type="date" value={superlativesRevealDate} onChange={e => setSuperlativesRevealDate(e.target.value)} style={input} />
+              {superlativesRevealDate && <button onClick={() => setSuperlativesRevealDate('')} style={{ ...btn(C.red), marginLeft: 8, fontSize: 11, padding: '6px 10px' }}>CLEAR</button>}
+            </div>
 
             <h2 style={{ fontSize: 20, fontWeight: 800, textTransform: 'uppercase', marginBottom: 16 }}>CHANGE ADMIN PASSWORD</h2>
             <input type="password" placeholder="New password (leave blank to keep)" value={newAdminPw} onChange={e => setNewAdminPw(e.target.value)} style={{ ...input, marginBottom: 16 }} />
