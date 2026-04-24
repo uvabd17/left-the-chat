@@ -9,6 +9,8 @@ const C = {
   purple: '#B18CFF', blue: '#59B8FF', orange: '#FFA64D', green: '#23C45E'
 }
 
+const ADMIN_ROLL = '22R01A7365'
+
 function HomeButton({ navigate }) {
   return (
     <button
@@ -115,6 +117,7 @@ export default function Awards() {
   const [voting, setVoting] = useState(false)
   const [search, setSearch] = useState('')
   const [confirmTarget, setConfirmTarget] = useState(null)
+  const [adminBlockOpen, setAdminBlockOpen] = useState(false)
   const [tab, setTab] = useState('vote') // vote or halloffame
 
   const revealed = revealDate ? new Date(revealDate) <= new Date() : false
@@ -329,6 +332,36 @@ export default function Awards() {
             {/* Voting grid — show if user hasn't voted yet */}
             {activeCategory && !myVote && (
               <>
+                {/* Admin block modal — fun nope for voting admin */}
+                {adminBlockOpen && (
+                  <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+                  }}>
+                    <div style={{
+                      background: C.yellow, border: `3px solid ${C.border}`,
+                      boxShadow: `8px 8px 0 ${C.border}`, padding: 28,
+                      textAlign: 'center', maxWidth: 340, width: '100%',
+                      animation: 'fadeUp 0.2s ease-out'
+                    }}>
+                      <div style={{ fontSize: 48, marginBottom: 8 }}>🫣</div>
+                      <p style={{ fontWeight: 900, fontSize: 20, textTransform: 'uppercase', marginBottom: 8 }}>
+                        NICE TRY
+                      </p>
+                      <p style={{ fontSize: 14, color: '#000', marginBottom: 20, lineHeight: 1.4 }}>
+                        admin built this whole thing. he's the ref, not a player 🏁 pick someone else.
+                      </p>
+                      <button onClick={() => setAdminBlockOpen(false)} style={{
+                        background: C.surface, border: `3px solid ${C.border}`,
+                        boxShadow: `4px 4px 0 ${C.border}`,
+                        padding: '10px 20px', fontWeight: 900, fontSize: 14, cursor: 'pointer',
+                        fontFamily: 'DM Sans, sans-serif', textTransform: 'uppercase'
+                      }}>MY BAD</button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Confirm modal */}
                 {confirmTarget && (
                   <div style={{
@@ -396,7 +429,7 @@ export default function Awards() {
                   {filteredStudents.map((s, i) => (
                     <div
                       key={s.id}
-                      onClick={() => setConfirmTarget(s.id)}
+                      onClick={() => s.id === ADMIN_ROLL ? setAdminBlockOpen(true) : setConfirmTarget(s.id)}
                       style={{
                         background: C.surface, border: `2px solid ${C.border}`,
                         cursor: 'pointer', textAlign: 'center', padding: 8,
