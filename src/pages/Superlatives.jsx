@@ -86,7 +86,7 @@ export default function Superlatives() {
     if (isRevealed) {
       const counts = {}
       await Promise.all(p.map(async (poll, i) => {
-        const pollId = `poll_${i}`
+        const pollId = poll.id || `poll_${i}`
         const votes = await getSuperlativeVotes(pollId)
         let aCount = 0, bCount = 0
         votes.forEach(v => {
@@ -101,7 +101,8 @@ export default function Superlatives() {
   }
 
   async function handleVote(pollIndex, winnerRollNo) {
-    const pollId = `poll_${pollIndex}`
+    const poll = polls[pollIndex]
+    const pollId = poll?.id || `poll_${pollIndex}`
     if (myVotes[pollId]) return
     setVoting(pollId)
     try {
@@ -163,7 +164,7 @@ export default function Superlatives() {
         )}
 
         {polls.map((poll, i) => {
-          const pollId = `poll_${i}`
+          const pollId = poll.id || `poll_${i}`
           const myPick = myVotes[pollId]
           const counts = voteCounts[pollId]
           const stuA = studentsMap[poll.optionA]

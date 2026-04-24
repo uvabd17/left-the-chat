@@ -736,7 +736,7 @@ export default function AdminPanel() {
                 <button onClick={() => setSuperlatives(superlatives.filter((_, j) => j !== i))} style={{ ...btn(C.red), marginTop: 8, fontSize: 12 }}>REMOVE</button>
               </div>
             ))}
-            <button onClick={() => setSuperlatives([...superlatives, { question: '', optionA: '', optionB: '' }])} style={{ ...btn(C.surface), marginBottom: 12 }}>+ ADD POLL</button>
+            <button onClick={() => setSuperlatives([...superlatives, { id: Math.random().toString(36).slice(2, 10), question: '', optionA: '', optionB: '' }])} style={{ ...btn(C.surface), marginBottom: 12 }}>+ ADD POLL</button>
             <div style={{ marginBottom: 24 }}>
               <p style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 13, marginBottom: 8 }}>This or That — results reveal date</p>
               <p style={{ fontSize: 11, color: '#555', marginBottom: 8 }}>Before this date, students only see "locked in" after voting. On this date, everyone sees vote percentages.</p>
