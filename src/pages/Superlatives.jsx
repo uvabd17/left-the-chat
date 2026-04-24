@@ -54,9 +54,6 @@ export default function Superlatives() {
   const [voteCounts, setVoteCounts] = useState({})
   const [loading, setLoading] = useState(true)
   const [voting, setVoting] = useState(null)
-  const [revealDate, setRevealDate] = useState(null)
-
-  const revealed = revealDate ? new Date(revealDate) <= new Date() : false
 
   useEffect(() => {
     const s = getSession()
@@ -71,9 +68,6 @@ export default function Superlatives() {
     ])
     const p = settings?.superlatives || []
     setPolls(p)
-    const rDate = settings?.superlativesRevealDate || null
-    setRevealDate(rDate)
-    const isRevealed = rDate ? new Date(rDate) <= new Date() : false
     const map = {}
     stuList.forEach(s => { map[s.id] = s })
     setStudentsMap(map)
@@ -82,21 +76,20 @@ export default function Superlatives() {
     userVotes.forEach(v => { vMap[v.poll] = v.winner })
     setMyVotes(vMap)
 
-    // Load vote counts only after reveal date (for all polls)
-    if (isRevealed) {
-      const counts = {}
-      await Promise.all(p.map(async (poll, i) => {
-        const pollId = poll.id || `poll_${i}`
-        const votes = await getSuperlativeVotes(pollId)
-        let aCount = 0, bCount = 0
-        votes.forEach(v => {
-          if (v.winner === poll.optionA) aCount++
-          else if (v.winner === poll.optionB) bCount++
-        })
-        counts[pollId] = { a: aCount, b: bCount, total: aCount + bCount }
-      }))
-      setVoteCounts(counts)
-    }
+    // Load counts for polls this user has voted on — they've earned the reveal.
+    const counts = {}
+    await Promise.all(p.map(async (poll, i) => {
+      const pollId = poll.id || `poll_${i}`
+      if (!vMap[pollId]) return
+      const votes = await getSuperlativeVotes(pollId)
+      let aCount = 0, bCount = 0
+      votes.forEach(v => {
+        if (v.winner === poll.optionA) aCount++
+        else if (v.winner === poll.optionB) bCount++
+      })
+      counts[pollId] = { a: aCount, b: bCount, total: aCount + bCount }
+    }))
+    setVoteCounts(counts)
     setLoading(false)
   }
 
@@ -109,17 +102,14 @@ export default function Superlatives() {
       await saveSuperlativeVote(pollId, session.rollNo, winnerRollNo)
       setMyVotes(prev => ({ ...prev, [pollId]: winnerRollNo }))
 
-      // Only fetch/show counts if results are already revealed
-      if (revealed) {
-        const votes = await getSuperlativeVotes(pollId)
-        const poll = polls[pollIndex]
-        let aCount = 0, bCount = 0
-        votes.forEach(v => {
-          if (v.winner === poll.optionA) aCount++
-          else if (v.winner === poll.optionB) bCount++
-        })
-        setVoteCounts(prev => ({ ...prev, [pollId]: { a: aCount, b: bCount, total: aCount + bCount } }))
-      }
+      // Fetch live counts now — voter earned the reveal by locking in.
+      const votes = await getSuperlativeVotes(pollId)
+      let aCount = 0, bCount = 0
+      votes.forEach(v => {
+        if (v.winner === poll.optionA) aCount++
+        else if (v.winner === poll.optionB) bCount++
+      })
+      setVoteCounts(prev => ({ ...prev, [pollId]: { a: aCount, b: bCount, total: aCount + bCount } }))
     } catch {
       alert('VOTE FAILED. PLEASE TRY AGAIN.')
     } finally {
@@ -141,16 +131,6 @@ export default function Superlatives() {
         <div style={{ marginBottom: 24, animation: 'fadeUp 0.3s ease-out' }}>
           <h1 style={{ fontSize: 32, fontWeight: 900, textTransform: 'uppercase' }}>⚡ THIS OR THAT</h1>
           <p style={{ color: '#555', fontSize: 14, fontStyle: 'italic' }}>pick one, no skipping</p>
-          {revealDate && !revealed && (
-            <p style={{ fontSize: 12, color: '#555', fontWeight: 700, textTransform: 'uppercase', marginTop: 8 }}>
-              RESULTS DROP ON {new Date(revealDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase()}
-            </p>
-          )}
-          {revealed && (
-            <p style={{ fontSize: 12, color: C.green, fontWeight: 900, textTransform: 'uppercase', marginTop: 8 }}>
-              🎉 RESULTS ARE LIVE
-            </p>
-          )}
         </div>
 
         {polls.length === 0 && (

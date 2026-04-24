@@ -69,7 +69,6 @@ export default function AdminPanel() {
   const [awardsRevealDate, setAwardsRevealDate] = useState('')
   const [pastWinners, setPastWinners] = useState([])
   const [superlatives, setSuperlatives] = useState([])
-  const [superlativesRevealDate, setSuperlativesRevealDate] = useState('')
   const [slamQuestions, setSlamQuestions] = useState([])
   const [newAdminPw, setNewAdminPw] = useState('')
   const [testMode, setTestMode] = useState(false)
@@ -117,7 +116,6 @@ export default function AdminPanel() {
       }
       setAwardsRevealDate(settingsValue.awardsRevealDate || '')
       setSuperlatives(settingsValue.superlatives || [])
-      setSuperlativesRevealDate(settingsValue.superlativesRevealDate || '')
       setSlamQuestions(settingsValue.slamQuestions || [])
     } else {
       setClassQuestions([])
@@ -278,7 +276,6 @@ export default function AdminPanel() {
       awardsCategories: { active: activeAward, pastWinners },
       awardsRevealDate,
       superlatives,
-      superlativesRevealDate,
       slamQuestions
     })
     if (newAdminPw.trim()) {
@@ -736,13 +733,7 @@ export default function AdminPanel() {
                 <button onClick={() => setSuperlatives(superlatives.filter((_, j) => j !== i))} style={{ ...btn(C.red), marginTop: 8, fontSize: 12 }}>REMOVE</button>
               </div>
             ))}
-            <button onClick={() => setSuperlatives([...superlatives, { id: Math.random().toString(36).slice(2, 10), question: '', optionA: '', optionB: '' }])} style={{ ...btn(C.surface), marginBottom: 12 }}>+ ADD POLL</button>
-            <div style={{ marginBottom: 24 }}>
-              <p style={{ fontWeight: 700, textTransform: 'uppercase', fontSize: 13, marginBottom: 8 }}>This or That — results reveal date</p>
-              <p style={{ fontSize: 11, color: '#555', marginBottom: 8 }}>Before this date, students only see "locked in" after voting. On this date, everyone sees vote percentages.</p>
-              <input type="date" value={superlativesRevealDate} onChange={e => setSuperlativesRevealDate(e.target.value)} style={input} />
-              {superlativesRevealDate && <button onClick={() => setSuperlativesRevealDate('')} style={{ ...btn(C.red), marginLeft: 8, fontSize: 11, padding: '6px 10px' }}>CLEAR</button>}
-            </div>
+            <button onClick={() => setSuperlatives([...superlatives, { id: Math.random().toString(36).slice(2, 10), question: '', optionA: '', optionB: '' }])} style={{ ...btn(C.surface), marginBottom: 24 }}>+ ADD POLL</button>
 
             <h2 style={{ fontSize: 20, fontWeight: 800, textTransform: 'uppercase', marginBottom: 16 }}>CHANGE ADMIN PASSWORD</h2>
             <input type="password" placeholder="New password (leave blank to keep)" value={newAdminPw} onChange={e => setNewAdminPw(e.target.value)} style={{ ...input, marginBottom: 16 }} />
